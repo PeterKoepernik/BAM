@@ -1,0 +1,110 @@
+*.xopp
+.DS_Store
+errorFile*.txt
+*.cpp
+*.c
+*.o
+*.so
+
+## data files
+value_network_data_dictionary_all.json
+*/replays/
+*.replay
+data_*.json
+match*.json
+!TerminalMCTS/src/pit/analyser_replays/*
+
+## Core latex/pdflatex auxiliary files:
+
+*.aux
+
+*.lof
+
+*.log
+
+*.lot
+
+*.fls
+
+*.out
+
+*.toc
+
+*.fmt
+
+*.fot
+
+*.cb
+
+*.cb2
+
+.*.lb
+
+*.thm
+
+*~
+
+## Intermediate documents:
+
+*.dvi
+
+*.xdv
+
+*-converted-to.*
+
+# these rules might exclude image files for figures etc.
+
+*.ps
+
+*.eps
+
+*.pdf
+
+
+
+## Generated if empty string is given at "Please type another file name for output:"
+
+.pdf
+
+
+
+## Bibliography auxiliary files (bibtex/biblatex/biber):
+
+*.bbl
+
+*.bcf
+
+*.blg
+
+*-blx.aux
+
+*-blx.bib
+
+*.run.xml
+
+
+
+## Build tool auxiliary files:
+
+*.fdb_latexmk
+
+*.synctex
+
+*.synctex(busy)
+
+*.synctex.gz
+
+*.synctex.gz(busy)
+
+*.pdfsync
+
+## vim
+
+*.swp
+
+## python
+
+*.pyc
+
+## xournal
+*.autosave.xopp

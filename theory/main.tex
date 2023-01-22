@@ -1,0 +1,111 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc} % So können Umlaute auch direkt eingegeben werden.
+\usepackage{amsmath}  % erweiterter Formelsatz
+\usepackage{amssymb}  % weitere mathematische 
+\usepackage{mathtools} % noch mehr praktisches Mathezeugs
+\usepackage{amsfonts} % sch"one Fonts besonders f"ur Formeln
+\usepackage{dsfont}
+\usepackage{graphicx} % Bilder einbinden
+\usepackage{hyperref} % Dokumentnavigation
+\usepackage[english]{babel}
+\usepackage[framed,thmmarks,amsmath]{ntheorem}
+\usepackage[capitalise]{cleveref}
+\usepackage{xcolor}
+
+%minimale seitenraender
+\usepackage[margin=1in,includefoot,footskip=30pt]{geometry}
+
+% Keine Einr"uckung bei neuem Paragraphen 
+%\parindent 0pt
+
+\usepackage{enumitem}
+\setenumerate[0]{label=(\roman*)}
+
+% Abstand obere Blattkante zur Kopfzeile ist 2.54cm - 15mm
+
+\theorembodyfont{\normalfont}
+\theoremheaderfont{\rmfamily\bfseries}
+\theorempreskip{.5cm}
+\theorempostskip{.5cm}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{remark}[theorem]{Remark}
+
+\theoremstyle{nonumberplain}
+\theorembodyfont{\normalfont}
+\theoremheaderfont{\rmfamily\bfseries}
+\newtheorem{anonlemma}{Lemma}
+\newtheorem{anonremark}{Remark}
+\newtheorem{idea}{Idea}
+\newtheorem{notation}{Notation}
+
+\theoremstyle{nonumberplain}
+\theoremheaderfont{\normalfont\itshape}
+\theoremsymbol{\ensuremath{\Box}}
+\newtheorem{proof}{Proof.}
+\newtheorem{proofsketch}{Sketch of Proof.}
+
+\theoremstyle{empty}
+\theoremheaderfont{\normalfont\itshape}
+\theoremsymbol{\ensuremath{\Box}}
+\newtheorem{proofof}{}
+
+\numberwithin{equation}{section} 
+
+% einige Abkuerzungen
+\newcommand{\C}{\mathbb{C}} % komplexe
+\newcommand{\R}{\mathbb{R}} % reelle
+\newcommand{\Q}{\mathbb{Q}} % rationale
+\newcommand{\Z}{\mathbb{Z}} % ganze
+\newcommand{\N}{\mathbb{N}} % natuerliche
+\newcommand{\A}{\mathcal{A}} % sigma algebra
+\renewcommand{\P}{\mathbb{P}} % W-Maß
+\newcommand{\E}{\mathbb{E}} % expectancy
+\newcommand{\V}{\mathbb{V}} % variance
+
+\newcommand*\dd{\mathop{}\!\mathrm{d}}
+\newcommand{\tendsto}[1]{\stackrel{#1}{\longrightarrow}}
+\newcommand{\id}{\mathds{1}}
+\newcommand{\ind}{\mathds{1}}
+
+\newcommand{\e}{\mathrm{e}}
+\renewcommand{\i}{\mathrm{i}}
+
+\newcommand{\nnorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
+    \right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+
+%disjoint union
+\makeatletter
+\def\moverlay{\mathpalette\mov@rlay}
+\def\mov@rlay#1#2{\leavevmode\vtop{%
+   \baselineskip\z@skip \lineskiplimit-\maxdimen
+   \ialign{\hfil$\m@th#1##$\hfil\cr#2\crcr}}}
+\newcommand{\charfusion}[3][\mathord]{
+    #1{\ifx#1\mathop\vphantom{#2}\fi
+        \mathpalette\mov@rlay{#2\cr#3}
+      }
+    \ifx#1\mathop\expandafter\displaylimits\fi}
+\makeatother
+
+\newcommand{\cupdot}{\charfusion[\mathbin]{\cup}{\cdot}}
+\newcommand{\bigcupdot}{\charfusion[\mathop]{\bigcup}{\cdot}}
+
+\begin{document}
+In a process with type A and B individuals, where the next generation (of $N$ individuals) is formed by choosing type A (resp.\ B) individuals with probability proportional to $1+s$ (resp.\ $1$), and $X_t$ is the proportion of type A individuals, then $Y_t = (X_{\left\lfloor Nt \right\rfloor })$ converges to a Wright-Fisher diffusion as $N\to \infty$. In the rescaling $\gamma = N s$ is fixed. Then the fixation probability of $Y$ is \[
+    h(x) = \frac{1-\e^{-2\gamma x}}{1-\e^{-2\gamma}}.
+\] This means that for finite but large $N$, the fixation probability started from one individual is (as long as $s\ll 1$),
+\begin{equation*}
+    p = \frac{1 - \e^{-2(Ns)(\frac{1}{N})}}{1-\e^{-2Ns}} = \frac{1- \e^{-2s}}{1-\e^{-2Ns}} \approx \begin{cases}
+        2s, & Ns \gg 1,\\
+        \frac{1}{N} + s, & Ns \ll 1,
+    \end{cases}
+    \asymp s \vee \frac{1}{N}.
+\end{equation*}
+
+\end{document}

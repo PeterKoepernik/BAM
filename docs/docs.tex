@@ -1,0 +1,172 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc} % So können Umlaute auch direkt eingegeben werden.
+\usepackage{amsmath}  % erweiterter Formelsatz
+\usepackage{amssymb}  % weitere mathematische 
+\usepackage{mathtools} % noch mehr praktisches Mathezeugs
+\usepackage{amsfonts} % sch"one Fonts besonders f"ur Formeln
+\usepackage{dsfont}
+\usepackage{graphicx} % Bilder einbinden
+\usepackage{hyperref} % Dokumentnavigation
+\usepackage[english]{babel}
+\usepackage[framed,thmmarks,amsmath]{ntheorem}
+\usepackage[capitalise]{cleveref}
+\usepackage{xcolor}
+
+%minimale seitenraender
+\usepackage[margin=1in,includefoot,footskip=30pt]{geometry}
+
+% Keine Einr"uckung bei neuem Paragraphen 
+%\parindent 0pt
+
+\usepackage{enumitem}
+\setenumerate[0]{label=(\roman*)}
+
+% Abstand obere Blattkante zur Kopfzeile ist 2.54cm - 15mm
+
+\theorembodyfont{\normalfont}
+\theoremheaderfont{\rmfamily\bfseries}
+\theorempreskip{.5cm}
+\theorempostskip{.5cm}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{remark}[theorem]{Remark}
+
+\theoremstyle{nonumberplain}
+\theorembodyfont{\normalfont}
+\theoremheaderfont{\rmfamily\bfseries}
+\newtheorem{anonlemma}{Lemma}
+\newtheorem{anonremark}{Remark}
+\newtheorem{idea}{Idea}
+\newtheorem{notation}{Notation}
+
+\theoremstyle{nonumberplain}
+\theoremheaderfont{\normalfont\itshape}
+\theoremsymbol{\ensuremath{\Box}}
+\newtheorem{proof}{Proof.}
+\newtheorem{proofsketch}{Sketch of Proof.}
+
+\theoremstyle{empty}
+\theoremheaderfont{\normalfont\itshape}
+\theoremsymbol{\ensuremath{\Box}}
+\newtheorem{proofof}{}
+
+\numberwithin{equation}{section} 
+
+% einige Abkuerzungen
+\newcommand{\C}{\mathbb{C}} % komplexe
+\newcommand{\R}{\mathbb{R}} % reelle
+\newcommand{\Q}{\mathbb{Q}} % rationale
+\newcommand{\Z}{\mathbb{Z}} % ganze
+\newcommand{\N}{\mathbb{N}} % natuerliche
+\newcommand{\A}{\mathcal{A}} % sigma algebra
+\renewcommand{\P}{\mathbb{P}} % W-Maß
+\newcommand{\E}{\mathbb{E}} % expectancy
+\newcommand{\V}{\mathbb{V}} % variance
+
+\newcommand*\dd{\mathop{}\!\mathrm{d}}
+\newcommand{\tendsto}[1]{\stackrel{#1}{\longrightarrow}}
+\newcommand{\id}{\mathds{1}}
+\newcommand{\ind}{\mathds{1}}
+
+\newcommand{\e}{\mathrm{e}}
+\renewcommand{\i}{\mathrm{i}}
+
+\newcommand{\nnorm}[1]{{\left\vert\kern-0.25ex\left\vert\kern-0.25ex\left\vert #1
+    \right\vert\kern-0.25ex\right\vert\kern-0.25ex\right\vert}}
+
+%disjoint union
+\makeatletter
+\def\moverlay{\mathpalette\mov@rlay}
+\def\mov@rlay#1#2{\leavevmode\vtop{%
+   \baselineskip\z@skip \lineskiplimit-\maxdimen
+   \ialign{\hfil$\m@th#1##$\hfil\cr#2\crcr}}}
+\newcommand{\charfusion}[3][\mathord]{
+    #1{\ifx#1\mathop\vphantom{#2}\fi
+        \mathpalette\mov@rlay{#2\cr#3}
+      }
+    \ifx#1\mathop\expandafter\displaylimits\fi}
+\makeatother
+
+\newcommand{\cupdot}{\charfusion[\mathbin]{\cup}{\cdot}}
+\newcommand{\bigcupdot}{\charfusion[\mathop]{\bigcup}{\cdot}}
+
+\begin{document}
+\title{BAM -- Documentation}
+\maketitle
+\vspace{20pt}
+
+\section{Mutation Operations}
+\subsection{Dense Layers}
+A layer is described by a tuple $(W,b,f)$, where $W \in \R ^{n_i \times n_o}$, $b\in \R ^{n_o}$ (where $n_i$ and $n_o$ are input- and output dimensions of the layer respectively), and $f\colon \R\to \R$ is the non-linearity.
+\subsubsection*{Insert}
+\begin{equation*}
+     (W_1,b_1,f_1) \rightarrow (W_2,b_2,f_2) \tendsto{\text{mutation}} (W_1,b_1,f_1) \rightarrow ( \ind,0,f_\text{new}) \rightarrow (W_2,b_2,f_2)
+\end{equation*}
+This insertion does not change output if $f_\text{new}\circ f_1 = f_1$, which is the case if $f_1 = f_\text{new}$ is idempotent, for example ReLU (and approximately $\tanh$).
+
+\subsubsection*{Widen}
+\begin{equation*}
+    (W,b,f) \rightarrow (W',b',f') \tendsto{\text{mutation}} ([W \,\, W_+] , [ b \,\, 0] , f) \rightarrow (\begin{bmatrix} W' \\ 0 \end{bmatrix} , b',f')
+\end{equation*}
+where $W_+ \in \R ^{n_i \times n_+}$ is randomly initialised.
+
+\subsubsection*{Delete}
+We ``linearise'' the layer to delete it,
+\begin{equation*}
+    (W_1,b_1,f_1) \rightarrow (W_2,b_2,f_2) \rightarrow (W_3,b_3,f_3) \tendsto{\text{mutation}} (W_1,b_1,f_1) \rightarrow (W_3 W_2, b_3 + W_3 b_2, f_3),
+\end{equation*}
+which is equivalent to replacing $f_2$ by the identity.
+
+\subsubsection*{Shrink}
+Choose random subset $S$ of $\left\{ 1, \ldots ,n_o \right\} $ of size $n_o' < n_o$, and then
+\begin{equation*}
+    (W,b,f) \to (W',b',f') \tendsto{\text{mutation}} (W[:,S], b[S], f) \to (W'[S,:], b', f')
+\end{equation*}
+
+\subsection{Conv2D Layers}
+We describe a Conv2D layer with a dimension tuple $(w,b,n_o)$ (width and breadth of the picture, number $n$ of filters), filter size $s$, filter matrix $W \in \R ^{s\times s\times n_i \times n_o}$, bias $b\in \R ^{n_o}$, and activation function $f$. We always assume padding is such that subsequent layers have the same image dimensions.
+
+\subsubsection*{Insert}
+Between layers $L_1$ (Conv2D) and $L_2$ (arbitrary) we insert a layer with $s$ arbitrary (say all layers have same $s$), $n = n_1$, \[
+    W[:,:,i,j] = \begin{bmatrix} 0 & 0 & 0\\ 0 & 1 & 0\\ 0 & 0 & 0 \end{bmatrix} ,\quad i\in [n_1],j\in[n_1]
+\] (and scaled up appropriately), $b = 0$, $f$ arbitrary. This does not change the output of the network if $f \circ f_1 = f_1$ (for example if $f = f_1$ is idempotent, say ReLU).
+
+\subsubsection*{Widen}
+This operation is meant to add more planes to a Conv2D layer, say $n \to n + n_+$. So we replace  \[
+    W \rightarrow \texttt{stack($W$,$W_+$,dim=3)} ,\qquad b \to \begin{pmatrix} b\\ 0 \end{pmatrix} \in \R ^{n + n_+},
+\] (dimensions are $0$-indexed) where $W_+ \in \R ^{s\times s\times n_i\times n_+}$ is randomly initialized. The subsequent layer (Conv2D or other) is modified to include new input weights $0$ for the new planes.
+
+\subsubsection*{Delete}
+Say we have an $s\times s$ filter $F$ followed by a $s'\times s'$ filter $F'$, with no activation in between. Then applying one after the other (with padding) is the same as applying one new $(s+s')\times (s+s')$ filter $G$. On a given pixel $(x,y)$ of a picture $P$, we have
+\begin{align*}
+    (F'\circ F)(P)(x,y) &= \sum_{(i',j')} F'(i',j') F(P)(x+i',y+j') \\
+                        &= \sum_{(i',j')} F(i',j') \sum_{(i,j)} F(i,j) P(x+i'+i,y+j'+j)\\
+                        &= \sum_{(k,l)} P(x+k,y+l) \sum_{\substack{(i,j),(i',j') \\ i+i'=k, j+j'=l} } F(i,j)F'(i',j')\\
+                        &\stackrel{!}{=} \sum_{(k,l)} P(x+k,y+l) G(k,l)
+\end{align*}
+This implies
+\begin{align*}
+    G(k,l) = \sum_{i,j = -s}^{s} F(i,j) F'(k-i,l-j) \eqqcolon F \star F'(k,l),
+\end{align*}
+where $F'(i',j') \coloneqq 0$ if either of $i',j' \not\in  \left\{ -s', \ldots ,s' \right\} $. But this is just $F$ applied to $F'$ (mirrored around the centre) with padding. If there are several planes, say $k \to n \to n'$, then \[
+    G_{pq} \coloneqq \sum_{r = 1}^n F_{pr} \star F'_{rq} ,\quad p \in [k], q \in [n'].
+\] 
+
+\subsubsection*{Shrink}
+Just delete some planes.
+
+\subsection{AveragePooling}
+\subsubsection*{Insert}
+If a set of pixels $p_1, \ldots ,p_n$ is reduced to its average $p$, and an outgoing node has associated weights $w_1, \ldots ,w_n$, the best thing we can do is to assume that all the pixels were equal to the average, which means assigning to $p$ the weight $w = \sum_{i=1}^n w_i$. (This is the same as applying the subsequent layer to the reconstruction from the pooling operation which assigns to each neighbourhood constantly the pooled value.)
+
+\subsubsection*{Delete}
+Removing a pooling operation means replacing a pooled pixel $p$, with associated weight $w$ say for some outgoing node, by a neighbourhood of pixels $p_1, \ldots ,p_n$. Then we can retain the same output by replacing $w$ by weights $w_1, \ldots ,w_n$ that sum to $w$, say $w_i = w / n$.
+
+
+\end{document}
