@@ -87,10 +87,6 @@ class ConvDense(Architecture):
         self.stacks[1].build(x)
         self.model = tf.keras.Model(self.input_layer, self.stacks[1].output)
 
-    def compile(self):
-        self.build()
-        self.model.compile(optimizer = 'adam', loss = self.loss, metrics = self.metrics)
-
     def mutate(self, num_mutations = 1):
         for i in range(num_mutations):
             info_list = super().mutate(num_mutations = 1, build = False)
