@@ -213,42 +213,62 @@ def test_simple_architecture(verbose = 0, layer_type = 'dense'):
         print(a.summary())
         print('')
 
-"""
-class Population:
-    def __init__(self,
-        architecture_factory,
-        population_size,
-        x_train,
-        y_train,
-        x_val,
-        y_val,
-        train_data_per_epoch = 0.5,
-        val_data_per_epoch = 1.0,
-        mutations_per_generation = 1.0
-        )
 
-    def epoch(self, verbose = 0, mutate_first = True)
+def test_value_arch():
+    a = ValueArchSimple(num_stats = 5)
+    model = a.get_model()
+    N = 100
+    x1 = np.random.random((N,5))
+    x2 = np.random.random((N,5))
+    ds1 = tf.data.Dataset.from_tensor_slices((x1,x2)).batch(2)
+    ds2 = tf.data.Dataset.from_tensor_slices((x2,x1)).batch(2)
 
-    def mutate(self)
-"""
+    for in1, in2 in zip(ds1, ds2):
+        out1 = model(in1)
+        out2 = model(in2)
+        assert (np.abs(out1 + out2 - 1) < EPS).all()
+
+def test_value_arch_conv():
+    a = ValueArchConv(num_stats = 5)
+    model = a.get_model()
+    N = 100
+    x1dense = np.random.random((N,5))
+    x2dense = np.random.random((N,5))
+    x1plane = np.random.random((N,28,14,6))
+    x2plane = np.random.random((N,28,14,6))
+    ds1 = tf.data.Dataset.from_tensor_slices((x1dense,x2dense,x1plane,x2plane)).batch(2)
+    ds2 = tf.data.Dataset.from_tensor_slices((x2dense,x1dense,x2plane,x1plane)).batch(2)
+
+    for in1, in2 in zip(ds1, ds2):
+        out1 = model(in1)
+        out2 = model(in2)
+        assert (np.abs(out1+out2-1) < EPS).all()
+
 
 from src.trainer import Population
 import matplotlib.pyplot as plt
 
-def test_population(verbose = 0):
+def test_population(verbose = 0, mode = 'simple'):
+    if mode != 'simple':
+        assert mode == 'value_arch'
     def factory():
-        n_in = 1
-        n_out = 1
-        return SimpleArchitecture(
-                (n_in,),
-                'mse',
-                output_size = n_out,
-                output_size_mutable = False,
-                output_activation = 'linear')
+        if mode == 'simple':
+            n_in = 1
+            n_out = 1
+            return SimpleArchitecture(
+                    (n_in,),
+                    'mse',
+                    output_size = n_out,
+                    output_size_mutable = False,
+                    output_activation = 'linear')
+        else:
+            return ValueArchSimple(num_stats = 5)
     
     def f(x):
         #return 2*np.cos(np.sqrt(np.abs(x))) + 1
-        return 2*np.sin(x)*np.cos(2*x)**2 + 1
+        if mode == 'simple':
+            return 2*np.sin(x)*np.cos(2*x)**2 + 1
+        return 1
 
     def dataset(size = 100000, vsplit = .1):
         l = -5
@@ -256,14 +276,25 @@ def test_population(verbose = 0):
         sigma = 0
         N_val = int(vsplit * size)
         N_train = size - N_val
-        x_train = l + (r-l) * np.random.random(N_train)
-        y_train = f(x_train) + np.random.normal(loc=0,scale=sigma,size=N_train)
-        x_val = l + (r-l) * np.random.random(N_val)
-        y_val = f(x_val) + np.random.normal(loc=0,scale=sigma,size=N_val)
+        if mode == 'simple':
+            x_train = l + (r-l) * np.random.random(N_train)
+            y_train = f(x_train) + np.random.normal(loc=0,scale=sigma,size=N_train)
+            x_val = l + (r-l) * np.random.random(N_val)
+            y_val = f(x_val) + np.random.normal(loc=0,scale=sigma,size=N_val)
+            ds_train = tf.data.Dataset.from_tensor_slices((x_train,y_train)).batch(16)
+            ds_val = tf.data.Dataset.from_tensor_slices((x_val,y_val)).batch(16)
+        else:
+            x_train1 = np.random.random((N_train,5))
+            x_train2 = np.random.random((N_train,5))
+            y_train = np.ones(N_train)
 
+            x_val1 = np.random.random((N_val,5))
+            x_val2 = np.random.random((N_val,5))
+            y_val = np.ones(N_val)
+
+            ds_train = tf.data.Dataset.from_tensor_slices(((x_train1,x_train2),y_train)).batch(16)
+            ds_val = tf.data.Dataset.from_tensor_slices(((x_val1,x_val2),y_val)).batch(16)
         
-        ds_train = tf.data.Dataset.from_tensor_slices((x_train,y_train)).batch(16)
-        ds_val = tf.data.Dataset.from_tensor_slices((x_val,y_val)).batch(16)
 
         return ds_train, ds_val
 
@@ -271,7 +302,7 @@ def test_population(verbose = 0):
 
     population = Population(
             factory,
-            10,
+            3,
             ds_train,
             ds_val,
             train_data_per_epoch = 0.8,
@@ -283,9 +314,9 @@ def test_population(verbose = 0):
         ys = [f(x) for x in xs]
         plt.plot(xs,ys,label='Truth')
         xs_t = tf.expand_dims(tf.convert_to_tensor(xs), 1)
-        ranks = [1,5,10]
+        ranks = [1] #,5,10]
         for i in ranks:
-            model = population.population[i-1].architecture.model
+            model = population.population[i-1].get_model()
             ys = tf.squeeze(model(xs_t)).numpy()
             plt.plot(xs,ys,label=f'Rank {i}')
         plt.legend()
@@ -294,9 +325,12 @@ def test_population(verbose = 0):
 
     epochs = 50
     for e in range(epochs):
-        population.mutate()
-        population.epoch(verbose = 1, parallelise = False)
-        print_population()
+        population.mutate(verbose = 1)
+        population.restart_session()
+        population.epoch(verbose = 1)
+        population.print_population()
+        if mode == 'simple':
+            print_population()
 
 
 from src.lib import fold_kernels, fold_conv2d_layers
@@ -410,7 +444,7 @@ def test_stack_saveload(verbose = 0, layer_type = 'dense'):
 
     assert not same_output(s0.model(), s1.model())
 
-from src.architectures import ConvDense
+from src.architectures import ConvDense, ValueArchSimple, ValueArchConv
 def test_arch_saveload(verbose = 0, layer_type = 'dense'):
     if layer_type == 'both':
         test_architecture_mutator(verbose, 'dense')
@@ -423,11 +457,12 @@ def test_arch_saveload(verbose = 0, layer_type = 'dense'):
     else:
         w, h = 20, 20
         input_shape = (w,h,n_in)
-    a = ConvDense(
-            input_shape,
-            'binary_cross_entropy',
-            output_size = n_out
-            )
+    a = ValueArchSimple(num_stats = 6)
+    #a = ConvDense(
+    #        input_shape,
+    #        'binary_cross_entropy',
+    #        output_size = n_out
+    #        )
     #a = SimpleArchitecture(
     #        input_shape,
     #        'binary_cross_entropy',

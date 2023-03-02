@@ -1,4 +1,4 @@
-from src.architectures import ConvDense, ConvDenseMixed
+from src.architectures import ConvDense, ConvDenseMixed, PriorArchSimple
 import src.lib as lib
 from tests.lib_test import same_output
 
@@ -42,3 +42,40 @@ def test_convdensemixed():
     a.adapt_layers(0, ('shrink', (layer_index, indices)))
     print(a.summary())
     assert same_output(a.model, a0.model)
+
+import numpy as np
+def test_priorarch():
+    num_stats0 = 2
+    num_statslr = 3
+    num_outputs0 = 1
+    num_outputslr = 2
+    a = PriorArchSimple(
+            num_stats0 = num_stats0,
+            num_statslr = num_statslr,
+            num_outputs0 = num_outputs0,
+            num_outputslr = num_outputslr
+            )
+    N = 3000
+    inp0 = np.random.random((N,num_stats0))
+    inpl = np.random.random((N,num_statslr))
+    inpr = np.random.random((N,num_statslr))
+    m = a.model
+
+    out1 = m((inp0,inpl,inpr)).numpy()
+    out2 = m((inp0,inpr,inpl)).numpy()
+
+    ind0 = list(range(num_outputs0))
+    indl = list(range(num_outputs0, num_outputs0+num_outputslr))
+    indr = list(range(num_outputs0+num_outputslr, num_outputs0+2*num_outputslr))
+
+    assert close(np.take(out1,ind0,axis=1), np.take(out2,ind0,axis=1))
+    assert close(np.take(out1,indl,axis=1), np.take(out2,indr,axis=1))
+    assert close(np.take(out1,indr,axis=1), np.take(out2,indl,axis=1))
+
+    for i in range(min(N,5)):
+        print(f'\nout1 = {list([round(x,3) for x in out1[i,:]])}')
+        print(f'out2 = {list([round(x,3) for x in out2[i,:]])}')
+
+EPS = 1e-4
+def close(x,y):
+    return (np.abs(x-y) < EPS).all()

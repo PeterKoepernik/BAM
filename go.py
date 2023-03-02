@@ -12,9 +12,13 @@ import tests.lib_test as test
 #
 #test.test_stack_saveload()
 #test.test_arch_saveload(layer_type = 'conv2d')
+#test.test_population(mode = 'value_arch')
+#test.test_value_arch()
+#test.test_value_arch_conv()
 
 import tests.arch_test as atest
 #atest.test_convdense()
 #atest.test_convdensemixed()
+atest.test_priorarch()
 
-import applications.mnist
+#import applications.mnist

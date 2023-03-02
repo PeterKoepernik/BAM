@@ -1,7 +1,6 @@
-import os, sys, time
+import os
 import numpy as np
 import tensorflow as tf
-import shutil
 
 if os.path.join(os.getcwd(),'src') == os.path.dirname(os.path.realpath(__file__)):
     ###### we are being called from within this package
@@ -9,8 +8,6 @@ if os.path.join(os.getcwd(),'src') == os.path.dirname(os.path.realpath(__file__)
 else:
     ###### we are being called from Terminal, in which case the BAM/src dir was added to global environment
     from lib import Architecture, pick_from_list
-
-os.environ["OMP_NUM_THREADS"] = '8'
 
 class Population:
     """
@@ -33,22 +30,20 @@ class Population:
                     'train_data_per_epoch',
                     'val_data_per_epoch',
                     'mutations_per_generation',
-                    'saveload',
-                    'num_cores',
-                    'reevaluation_probability']
+                    'saveload']
 
         print(f'Loading population at {directory}')
 
         generations = os.listdir(directory)
         assert len(generations) > 0
         for path in generations:
-            assert path.startswith('generation_') or path == '_tmp'
+            assert path.startswith('generation_')
 
 
         population_size = len(os.listdir(os.path.join(directory, generations[0])))
         assert population_size > 0
 
-        print(f'Found {len(generations)-1} generations of size {population_size}.')
+        print(f'Found {len(generations)} generations of size {population_size}.')
 
         from pathlib import Path
         directory = str(Path(directory)) # convert it to the natural OS representation (fex remove trailing / delimiter)
@@ -90,7 +85,6 @@ class Population:
             val_data_per_epoch = 1.0,
             mutations_per_generation = 1.0,
             saveload = True,
-            reevaluation_probability = .3, # with this probability we reevaluate models from previous generations. only makes sense if val_data_per_epoch < 1
             num_cores = 1 # if more than one we use parallelisation
             ):
         """
@@ -120,21 +114,6 @@ class Population:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
-        self.num_cores = num_cores
-        if num_cores > 1: ###### make _tmp directory for parallelisation
-            self.tmp_dir = os.path.join(directory, '_tmp')
-            if os.path.exists(self.tmp_dir):
-                shutil.rmtree(self.tmp_dir)
-            os.mkdir(self.tmp_dir)
-            self.tmp_dirs = [os.path.join(self.tmp_dir, f'tmp_{i}') for i in range(population_size)]
-            for dr in self.tmp_dirs:
-                os.mkdir(dr)
-            self.ds_train_path = os.path.join(self.tmp_dir,'ds_train')
-            self.ds_val_path = os.path.join(self.tmp_dir,'ds_val')
-            ds_train.save(self.ds_train_path)
-            ds_val.save(self.ds_val_path)
-
-        self.reeval_prob = reevaluation_probability
         self.generation = 0
         self.population_size = population_size
         
@@ -168,29 +147,6 @@ class Population:
         self.population = [architecture_factory() for i in range(population_size)]
         self.prev_population = [] # before last mutation+epoch
 
-    def evaluate_arch(self, arch):
-        arch.compile()
-        model = arch.model
-        ds_val = self.subsample_val()
-        val_losses = model.evaluate(ds_val, verbose = 0)
-
-        if len(arch.metrics) == 0:
-            val_loss = val_losses
-            arch.val_loss = val_loss
-        else:
-            val_loss, acc = val_losses[:2]
-            arch.val_loss = val_loss
-            arch.acc = acc # this is not renamed to val_acc for historical reasons
-
-    def evaluate_population(self):
-        for arch in self.population:
-            self.evaluate_arch(arch)
-
-    def clear_tmp(self):
-        for dr in self.tmp_dirs:
-            shutil.rmtree(dr)
-            os.mkdir(dr)
-
     def update_datasets(self, ds_train, ds_val, train_size = 0, val_size = 0):
         self.train_size = train_size        
         if train_size == 0:
@@ -203,31 +159,9 @@ class Population:
         assert self.train_size > 0
         assert self.train_size > 0        
 
-    """
-    This is a class method, because it will be called from this script run as __main__ when parallelised
-    """
-    def process(arch, ds_train, ds_val, verbose = 0):
-        arch.compile()
-        model = arch.model
+    def epoch(self, verbose = 0):
+        assert self.ds_train != None and self.ds_val != None
 
-        ###### train
-        hist = model.fit(ds_train, epochs = 1, verbose = verbose)
-        train_loss = hist.history['loss'][-1]
-        arch.train_loss = train_loss
-
-        ###### validation
-        val_losses = model.evaluate(ds_val, verbose = 0)
-        if len(arch.metrics) == 0:
-            val_loss = val_losses
-            arch.val_loss = val_loss
-        else:
-            val_loss, acc = val_losses[:2]
-            arch.val_loss = val_loss
-            arch.acc = acc # this is not renamed to val_acc for historical reasons
-            arch.train_acc = hist.history['accuracy'][-1]
-
-
-    def subsample_ds(ds, sz, proportion):
         ###### used for subsampling datasets
         def filter_factory(present_samples):
             def _filter(i, el):
@@ -237,92 +171,46 @@ class Population:
         def project(i, el):
             return el
 
-        present_datasets = (np.random.random(sz) < proportion) # list of True/False of length of training data with fraction of True's on average self.train_data_per_epoch
-        while np.sum(present_datasets) == 0:
-            present_datasets = (np.random.random(sz) < proportion)
-        _filter = filter_factory(tf.convert_to_tensor(present_datasets))
-        ds_sampled = ds.enumerate().filter(_filter).map(project)
-        return ds_sampled
+        def process(arch):
+            arch.compile()
+            model = arch.model
 
-    def subsample_train(self):
-        return Population.subsample_ds(self.ds_train, self.train_size, self.train_data_per_epoch)
+            ###### sample dataset
+            present_datasets = tf.convert_to_tensor(np.random.random(self.train_size) < self.train_data_per_epoch) # list of True/False of length of training data with fraction of True's on average self.train_data_per_epoch
+            _filter = filter_factory(present_datasets)
+            ds_train_sampled = self.ds_train.enumerate().filter(_filter).map(project)
 
-    def subsample_val(self):
-        return Population.subsample_ds(self.ds_val, self.val_size, self.val_data_per_epoch)
+            ###### train
+            hist = model.fit(ds_train_sampled, epochs = 1, verbose = verbose)
+            train_loss = hist.history['loss'][-1]
+            arch.train_loss = train_loss
+            #todo test the above at an example, later test how much slower is this than using x_train when data_per_epcoh = 1 (ie how much overhead does the subsampling have)
 
-    def epoch(self, verbose = 0):
-        assert self.ds_train != None and self.ds_val != None
+            ###### compute validation error
+            present_datasets = tf.convert_to_tensor(np.random.random(self.val_size) < self.val_data_per_epoch) # list of True/False of length of training data with fraction of True's on average self.train_data_per_epoch
+            _filter = filter_factory(present_datasets)
+            ds_val_sampled = self.ds_val.enumerate().filter(_filter).map(project)
+            val_losses = model.evaluate(ds_val_sampled, verbose = 0)
+            if len(arch.metrics) == 0:
+                val_loss = val_losses
+                arch.val_loss = val_loss
+            else:
+                val_loss, acc = val_losses[:2]
+                arch.val_loss = val_loss
+                arch.acc = acc # this is not renamed to val_acc for historical reasons
+                arch.train_acc = hist.history['accuracy'][-1]
 
         ###### train
         print(f'Epoch: 0/{len(self.population)}', end = '\r')
-        if self.num_cores == 1:
-            for i, arch in enumerate(self.population):
-                ds_train_sampled = self.subsample_train()
-                ds_val_sampled = self.subsample_val()
-                Population.process(arch, ds_train_sampled, ds_val_sampled, verbose = verbose)
-                print(f'Epoch: {i+1}/{len(self.population)}', end = '\r')
-        else:
-            ###### parallelise
-            self.clear_tmp()
-
-            from subprocess import Popen, PIPE
-
-            file_dir = os.path.dirname(os.path.realpath(__file__))
-            script = os.path.join(file_dir, 'trainer.py')
-
-            def arch_path(i):
-                return os.path.join(self.tmp_dirs[i], 'arch')
-
-            def launch(i):
-                self.population[i].save(arch_path(i))
-                return Popen([
-                            'python', 
-                            script,
-                            str(i),
-                            arch_path(i),
-                            self.ds_train_path,
-                            self.ds_val_path,
-                            str(self.train_size),
-                            str(self.val_size),
-                            str(self.train_data_per_epoch),
-                            str(self.val_data_per_epoch)
-                            ])#, stdout = PIPE)#, stderr = PIPE)
-            
-            processes = [launch(i) for i in range(min(self.num_cores, self.population_size))]
-            next_task = len(processes)
-            finished = 0
-            while next_task < self.population_size:
-                time.sleep(5)
-                for i in range(len(processes)):
-                    p = processes[i]
-                    if not (p.poll() is None):
-                        processes[i] = launch(next_task)
-                        finished += 1
-                        print(f'Epoch: {finished}/{len(self.population)}', end = '\r')
-                        next_task += 1
-                        if next_task == self.population_size:
-                            break
-            waiting = [True] * len(processes)
-            while sum(waiting) > 0:
-                time.sleep(5)
-                for i in range(len(processes)):
-                    p = processes[i]
-                    if waiting[i] and not (p.poll() is None):
-                        waiting[i] = False
-                        finished += 1
-                        print(f'Epoch: {finished}/{len(self.population)}', end = '\r')
-
-            ###### load back in the individuals
-            for i in range(self.population_size):
-                self.population[i] = Architecture.load(arch_path(i))
-
+        for i, arch in enumerate(self.population):
+            process(arch)
+            print(f'Epoch: {i+1}/{len(self.population)}', end = '\r')
         print('')
 
         ###### add old population if they were already evaluated (only not in the very first run)
         for a in self.prev_population:
-            if (not hasattr(a, 'val_loss')) or np.random.random() < self.reeval_prob:
-                self.evaluate_arch(a)
-            self.population.append(a)
+            if hasattr(a, 'val_loss'):
+                self.population.append(a)
 
         ###### sort according to performance and cut to best half
         self.population.sort(key = lambda a: a.val_loss)
@@ -359,7 +247,7 @@ class Population:
 
     def save(self):
         if not self.saveload:
-            raise Exception('save() was called but saveload is set to False.')
+            return False
 
         base = os.path.join(self.directory, f'generation_{self.generation}')
         if os.path.exists(base):
@@ -407,6 +295,7 @@ class Population:
 
             from scipy.stats import poisson
             num_mutations = poisson.rvs(mu=self.mutations_per_generation)
+            #num_mutations = 1
             child.mutate(num_mutations)
 
             new_population.append(child)
@@ -438,32 +327,20 @@ if __name__ == '__main__':
     """
     import sys, os
 
-    assert len(sys.argv) == 9
-    #process_id = int(sys.argv[1])
-    #path_to_train_ds = sys.argv[2]
-    #path_to_val_ds = sys.argv[3]
-    #path_to_individual = sys.argv[4]
-    #
-    #assert os.path.exists(path_to_train_ds)
-    #assert os.path.exists(path_to_val_ds)
-    #assert os.path.exists(path_to_individual)
-
-    #ds_train = tf.data.Dataset.load(path_to_train_ds)
-    #ds_val = tf.data.Dataset.load(path_to_val_ds)
+    assert len(sys.argv) == 5
     process_id = int(sys.argv[1])
-    arch_path = sys.argv[2]
-    ds_train_path = sys.argv[3]
-    ds_val_path = sys.argv[4]
-    train_sz = int(sys.argv[5])
-    val_sz = int(sys.argv[6])
-    train_prop = float(sys.argv[7])
-    val_prop = float(sys.argv[8])
+    path_to_train_ds = sys.argv[2]
+    path_to_val_ds = sys.argv[3]
+    path_to_individual = sys.argv[4]
+    
+    assert os.path.exists(path_to_train_ds)
+    assert os.path.exists(path_to_val_ds)
+    assert os.path.exists(path_to_individual)
 
-    ds_train = Population.subsample_ds(tf.data.Dataset.load(ds_train_path), train_sz, train_prop)
-    ds_val = Population.subsample_ds(tf.data.Dataset.load(ds_val_path), val_sz, val_prop)
-    arch = Architecture.load(arch_path)
-
-    Population.process(arch, ds_train, ds_val)
-
-    shutil.rmtree(arch_path)
-    arch.save(arch_path)
+    train_ds = tf.data.Dataset.load(path_to_train_ds)
+    print(f'This is process number {process_id}. This is the first element of my training set.')
+    for el in train_ds.take(1):
+        print(el)
+    import time
+    time.sleep(3)
+    

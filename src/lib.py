@@ -6,63 +6,6 @@ import random, os
 MAX_SCORE = 1000000
 MAX_BIAS_FACTOR = 5 # the most likely mutation is at most this much more likely than the most unlikely
 
-class ArchitectureMutator:
-    """
-    Sits on the instantiation of an Architecture and mutates it in various ways
-    """
-    def __init__(self, architecture):
-        raise Exception('ArchitectureMutator is DEPRECATED')
-
-        self.architecture = architecture
-        self.stack_bias = [1] * len(architecture.stacks)
-        self.bias_momentum = 1 # no bias change for now (formerly 1.2)
-        
-        self.mutators = [
-                StackMutator(stack) for stack in architecture.stacks
-                ]
-
-    def mutate(self, num_mutations = 1):
-        """
-        returns list [(stack_index, infos)]
-        where infos is as returned by StackMutator.mutate()
-        """
-        if num_mutations == 0:
-            return []
-
-        if num_mutations > 1:
-            infos = []
-            for i in range(num_mutations):
-                infos += [self.mutate()]
-            return infos
-
-        ###### pick stack
-        stack_index = pick_from_list(self.stack_bias)
-
-        ###### update bias
-        update_bias(self.stack_bias, stack_index, self.bias_momentum, MAX_BIAS_FACTOR)
-
-        ###### perform mutation
-        infos = self.mutators[stack_index].mutate()
-
-        self.architecture.mutation_callback(stack_index, infos)
-        self.architecture.build()
-
-        return [(stack_index, infos)]
-
-    def deep_copy(self):
-        mutator_copies = [m.deep_copy() for m in self.mutators]
-
-        arch_copy = self.architecture.shallow_copy()
-        arch_copy.stacks = [m.stack for m in mutator_copies]
-        arch_copy.build()
-
-        copy = ArchitectureMutator(arch_copy)
-        copy.stack_bias = cpy.deepcopy(self.stack_bias)
-        copy.bias_momentum = self.bias_momentum
-        copy.mutators = mutator_copies
-
-        return copy
-
 def update_bias(biases, index, factor, max_relative_factor):
     if type(biases) == list:
         min_entry = min([val for val in biases if val > 0])
@@ -82,98 +25,98 @@ def update_bias(biases, index, factor, max_relative_factor):
                 biases[key] = .5 * biases[key]
 
 
-class StackMutator:
-    """
-    Sits on a stack and has functions to mutate it in various ways
-    """
-
-    def __init__(self, stack):
-        raise Exception('StackMutator is DEPRECATED')
-        self.stack = stack
-
-        ###### mutation bias (linearly weighted) scores that determine how likely a mutation is to change the width of some layer, or insert a layer
-        self.mutation_bias = {
-                'widen': 3,
-                'insert': 2,
-                'shrink': 1,
-                'delete': 1
-                }
-
-        ###### for each operation a list with a score per layer, higher score making it (linearly) more likely to mutate at this index
-        self.layer_bias = {
-                'widen': [1] * (len(self.stack.layers)-1) + [int(self.stack.output_size_mutable)],
-                'insert': [0] + ([1] * (len(self.stack.layers)-1)),
-                'shrink': [1] * (len(self.stack.layers)-1) + [int(self.stack.output_size_mutable)],
-                'delete': [0] + [1] * (len(self.stack.layers)-2) + [0] # can't delete output layer or first layer
-                }
-
-        self.layer_widen_factor = 1.2 # 20% increase in layer size when mutating
-        self.layer_shrink_factor = 1 / 1.2
-        self.bias_momentum = 1 # (formerly 1.2) # when performing a mutation, this mutation is this much more likely to be chosen next time
-
-    def print_bias(self):
-        print('Mutation bias:')
-        for key, val in self.mutation_bias.items():
-            print(f'{key}: {val}')
-        print('')
-
-        print('Layer bias:')
-        for key, l in self.layer_bias.items():
-            print(f'{key}: ' + str(l))
-
-    def mutate(self):
-        """
-        returns list of (mutation_type, info) where info is layer_index for insert/delete and (layer_index, new/old_nodes) for shrink/widen
-        """
-        ###### pick operation
-        #print(f'Called mutate.')
-        #self.print_bias()
-        op = pick_from_dict(self.mutation_bias)
-        while sum(self.layer_bias[op]) == 0:
-            op = pick_from_dict(self.mutation_bias)
-
-        layer_index = pick_from_list(self.layer_bias[op])
-        #print(f'Picked operation {op} and layer {layer_index}')
-
-        ###### update bias
-        update_bias(self.mutation_bias, op, self.bias_momentum, MAX_BIAS_FACTOR)
-        update_bias(self.layer_bias[op], layer_index, self.bias_momentum, MAX_BIAS_FACTOR)
-
-        ###### perform operation
-        if op == 'widen':
-            new_nodes = self.widen_layer(layer_index, self.layer_widen_factor)
-            info = (layer_index, new_nodes)
-        elif op == 'insert':
-            self.insert_layer(layer_index)
-            for key in self.layer_bias.keys():
-                bias = self.layer_bias[key][layer_index] if len(self.layer_bias[key]) > 0 else 1
-                bias = max(1,bias)
-                self.layer_bias[key].insert(layer_index, bias)
-            info = layer_index
-        elif op == 'shrink':
-            deleted_nodes = self.shrink_layer(layer_index, self.layer_shrink_factor)
-            info = (layer_index, deleted_nodes)
-        elif op == 'delete':
-            self.delete_layer(layer_index)
-            for key in self.layer_bias.keys():
-                self.layer_bias[key].pop(layer_index)
-            info = (layer_index, deleted_nodes)
-        else:
-            raise Exception('Tried to mutate unknown operation.')
-
-        return op, info
-
-    def deep_copy(self, stack = None):
-        if stack == None:
-            stack = self.stack.deep_copy()
-
-        mutator_copy = StackMutator(stack)
-        mutator_copy.mutation_bias = cpy.deepcopy(self.mutation_bias)
-        mutator_copy.layer_bias = cpy.deepcopy(self.layer_bias)
-        mutator_copy.layer_widen_factor = self.layer_widen_factor
-        mutator_copy.layer_shrink_factor = self.layer_shrink_factor
-
-        return mutator_copy
+#class StackMutator:
+#    """
+#    Sits on a stack and has functions to mutate it in various ways
+#    """
+#
+#    def __init__(self, stack):
+#        raise Exception('StackMutator is DEPRECATED')
+#        self.stack = stack
+#
+#        ###### mutation bias (linearly weighted) scores that determine how likely a mutation is to change the width of some layer, or insert a layer
+#        self.mutation_bias = {
+#                'widen': 3,
+#                'insert': 2,
+#                'shrink': 1,
+#                'delete': 1
+#                }
+#
+#        ###### for each operation a list with a score per layer, higher score making it (linearly) more likely to mutate at this index
+#        self.layer_bias = {
+#                'widen': [1] * (len(self.stack.layers)-1) + [int(self.stack.output_size_mutable)],
+#                'insert': [0] + ([1] * (len(self.stack.layers)-1)),
+#                'shrink': [1] * (len(self.stack.layers)-1) + [int(self.stack.output_size_mutable)],
+#                'delete': [0] + [1] * (len(self.stack.layers)-2) + [0] # can't delete output layer or first layer
+#                }
+#
+#        self.layer_widen_factor = 1.2 # 20% increase in layer size when mutating
+#        self.layer_shrink_factor = 1 / 1.2
+#        self.bias_momentum = 1 # (formerly 1.2) # when performing a mutation, this mutation is this much more likely to be chosen next time
+#
+#    def print_bias(self):
+#        print('Mutation bias:')
+#        for key, val in self.mutation_bias.items():
+#            print(f'{key}: {val}')
+#        print('')
+#
+#        print('Layer bias:')
+#        for key, l in self.layer_bias.items():
+#            print(f'{key}: ' + str(l))
+#
+#    def mutate(self):
+#        """
+#        returns list of (mutation_type, info) where info is layer_index for insert/delete and (layer_index, new/old_nodes) for shrink/widen
+#        """
+#        ###### pick operation
+#        #print(f'Called mutate.')
+#        #self.print_bias()
+#        op = pick_from_dict(self.mutation_bias)
+#        while sum(self.layer_bias[op]) == 0:
+#            op = pick_from_dict(self.mutation_bias)
+#
+#        layer_index = pick_from_list(self.layer_bias[op])
+#        #print(f'Picked operation {op} and layer {layer_index}')
+#
+#        ###### update bias
+#        update_bias(self.mutation_bias, op, self.bias_momentum, MAX_BIAS_FACTOR)
+#        update_bias(self.layer_bias[op], layer_index, self.bias_momentum, MAX_BIAS_FACTOR)
+#
+#        ###### perform operation
+#        if op == 'widen':
+#            new_nodes = self.widen_layer(layer_index, self.layer_widen_factor)
+#            info = (layer_index, new_nodes)
+#        elif op == 'insert':
+#            self.insert_layer(layer_index)
+#            for key in self.layer_bias.keys():
+#                bias = self.layer_bias[key][layer_index] if len(self.layer_bias[key]) > 0 else 1
+#                bias = max(1,bias)
+#                self.layer_bias[key].insert(layer_index, bias)
+#            info = layer_index
+#        elif op == 'shrink':
+#            deleted_nodes = self.shrink_layer(layer_index, self.layer_shrink_factor)
+#            info = (layer_index, deleted_nodes)
+#        elif op == 'delete':
+#            self.delete_layer(layer_index)
+#            for key in self.layer_bias.keys():
+#                self.layer_bias[key].pop(layer_index)
+#            info = (layer_index, deleted_nodes)
+#        else:
+#            raise Exception('Tried to mutate unknown operation.')
+#
+#        return op, info
+#
+#    def deep_copy(self, stack = None):
+#        if stack == None:
+#            stack = self.stack.deep_copy()
+#
+#        mutator_copy = StackMutator(stack)
+#        mutator_copy.mutation_bias = cpy.deepcopy(self.mutation_bias)
+#        mutator_copy.layer_bias = cpy.deepcopy(self.layer_bias)
+#        mutator_copy.layer_widen_factor = self.layer_widen_factor
+#        mutator_copy.layer_shrink_factor = self.layer_shrink_factor
+#
+#        return mutator_copy
 
 import pickle
 
@@ -181,8 +124,13 @@ def save_object(obj, filename):
     if os.path.exists(filename):
         print(f'Warning: file \'{filename}\' already exists. Aborting.')
 
-    with open(filename, 'wb') as outp:  # Overwrites any existing file.
-        pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
+    try:
+        with open(filename, 'wb') as outp:  # Overwrites any existing file.
+            pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
+    except:
+        print('Something went wrong saving an object.')
+        print(f'All Attributes: {self.__dir__()}')
+        assert False
 
 def load_object(filename):
     with open(filename, 'rb') as inp:
@@ -205,6 +153,7 @@ class Stack:
             output_size_mutable = False,
             initial_width = 10,
             initial_depth = 2, # includes output layer
+            l2reg = .01, # this will also be mutated
             kernel_size = 3 # only used for conv2d
             ):
         """
@@ -222,6 +171,7 @@ class Stack:
         self.output_size_mutable = output_size_mutable
         self.initial_width = initial_width
         self.initial_depth = initial_depth
+        self.l2reg = l2reg
         self.kernel_size = kernel_size
 
         self.layers = []
@@ -230,23 +180,26 @@ class Stack:
             if self.layer_type == 'dense':
                 self.layers.append(tf.keras.layers.Dense(
                     output_size if out_layer else initial_width,
-                    activation = output_activation if out_layer else layer_activation
+                    activation = output_activation if out_layer else layer_activation,
+                    kernel_regularizer = tf.keras.regularizers.L2(l2reg)
                     ))
             elif self.layer_type == 'conv2d':
                 self.layers.append(tf.keras.layers.Conv2D(
                     output_size if out_layer else initial_width,
                     kernel_size,
                     activation = output_activation if out_layer else layer_activation,
-                    padding = 'same'
+                    padding = 'same',
+                    kernel_regularizer = tf.keras.regularizers.L2(l2reg)
                     ))
             else: assert False
 
         ###### mutation bias (linearly weighted) scores that determine how likely a mutation is to change the width of some layer, or insert a layer
         self.mutation_bias = {
-                'widen': 3,
-                'insert': 2,
-                'shrink': 1,
-                'delete': 1
+                'widen': 2,
+                'insert': 1,
+                'shrink': 2,
+                'delete': 1,
+                'change_reg': 2 if (self.l2reg > 0) else 0 # if we were initialised without regularisation there is no point changing it
                 }
 
         ###### for each operation a list with a score per layer, higher score making it (linearly) more likely to mutate at this index
@@ -260,6 +213,8 @@ class Stack:
         self.layer_widen_factor = 1.2 # 20% increase in layer size when mutating
         self.layer_shrink_factor = 1 / 1.2
         self.bias_momentum = 1 # (formerly 1.2) # when performing a mutation, this mutation is this much more likely to be chosen next time
+
+        self.change_reg_factor = 1.5
 
         self.build()
 
@@ -276,6 +231,10 @@ class Stack:
             raise Exception('stack.pkl does not exist.')
 
         stack = load_object(obj_path)
+
+        ###### for legacy reasons; some old stacks don't have this after being loaded
+        if not hasattr(stack, 'l2reg'):
+            stack.l2reg = 0.0
 
         ###### now stack has empty layers and input = None
         if input_tensor != None:
@@ -296,7 +255,8 @@ class Stack:
                 if stack.layer_type == 'dense':
                     layer = tf.keras.layers.Dense(
                             n_out,
-                            activation = stack.output_activation if out_layer else stack.layer_activation
+                            activation = stack.output_activation if out_layer else stack.layer_activation,
+                            kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                             )
                     layer.build(input_shape = (1, n_in))
                 elif stack.layer_type == 'conv2d':
@@ -304,7 +264,8 @@ class Stack:
                         n_out,
                         W.shape[0],
                         activation = stack.output_activation if out_layer else stack.layer_activation,
-                        padding = 'same'
+                        padding = 'same',
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
                     layer.build(input_shape = (1, 1, 1, n_in))
                 else: assert False
@@ -339,19 +300,16 @@ class Stack:
 
         tmplayers = self.layers
         tmpinp = self.input
+        tmpout = self.output
         self.layers = []
         self.input = None
+        self.output = None
 
-        try:
-            save_object(self, obj_path)
-        except:
-            print('Something went wrong saving a stack.')
-            print(f'All Attributes: {self.__dir__()}')
-            assert False
+        save_object(self, obj_path)
 
         self.layers = tmplayers
         self.input = tmpinp
-
+        self.output = tmpout
 
     def mutate(self):
         """
@@ -361,15 +319,23 @@ class Stack:
         #print(f'Called mutate.')
         #self.print_bias()
         op = pick_from_dict(self.mutation_bias)
-        while sum(self.layer_bias[op]) == 0:
+        while op != 'change_reg' and sum(self.layer_bias[op]) == 0:
             op = pick_from_dict(self.mutation_bias)
 
-        layer_index = pick_from_list(self.layer_bias[op])
-        #print(f'Picked operation {op} and layer {layer_index}')
+        update_bias(self.mutation_bias, op, self.bias_momentum, MAX_BIAS_FACTOR)
+
+        if op == 'change_reg':
+            if random.random() > .5:
+                self.l2reg = self.l2reg * self.change_reg_factor
+            else:
+                self.l2reg = self.l2reg / self.change_reg_factor
+            return op, None
 
         ###### update bias
-        update_bias(self.mutation_bias, op, self.bias_momentum, MAX_BIAS_FACTOR)
+        layer_index = pick_from_list(self.layer_bias[op])
         update_bias(self.layer_bias[op], layer_index, self.bias_momentum, MAX_BIAS_FACTOR)
+
+        #print(f'Picked operation {op} and layer {layer_index}')
 
         ###### perform operation
         if op == 'widen':
@@ -406,6 +372,8 @@ class Stack:
             x = l(x)
         self.output = x
 
+        return self.output
+
     def model(self):
         return tf.keras.Model(self.input, self.output)
 
@@ -417,7 +385,7 @@ class Stack:
        
     def deep_copy(self, input_tensor = None):
         """
-        if input_tensor = None it will be the same one
+        if input_tensor = None the copy will have the same input tensor
         """
         if input_tensor == None:
             input_tensor = self.input
@@ -431,6 +399,7 @@ class Stack:
                 output_size_mutable = self.output_size_mutable,
                 initial_width = self.initial_width,
                 initial_depth = self.initial_depth,
+                l2reg = self.l2reg,
                 kernel_size = self.kernel_size
                 )
 
@@ -450,7 +419,8 @@ class Stack:
             if self.layer_type == 'dense':
                 new_layer = tf.keras.layers.Dense(
                         n,
-                        activation = l.activation
+                        activation = l.activation,
+                        kernel_regularizer = tf.keras.regularizers.L2(self.l2reg)
                         )
             elif self.layer_type == 'conv2d':
                 k = kernel_size(l)
@@ -458,7 +428,8 @@ class Stack:
                         n,
                         k,
                         activation = l.activation,
-                        padding = 'same'
+                        padding = 'same',
+                        kernel_regularizer = tf.keras.regularizers.L2(self.l2reg)
                         )
             else: assert False
             x = new_layer(x)
@@ -494,10 +465,35 @@ class Architecture:
 
     def compile(self):
         self.build()
-        self.model.compile(optimizer = 'adam', loss = self.loss, metrics = self.metrics)
+        self.model.compile(optimizer = 'adam', loss = self.loss, metrics = self.metrics, run_eagerly=True)
+        return self.model
 
     def summary(self):
         pass
+
+    def print_weights(self):
+        print('\n===== Printing weights of Model =====')
+        self.summary()
+        print('\n==== WEIGHTS ====')
+        for i, stack in enumerate(self.stacks):
+            print(f'\n=== STACK {i} ===')
+            print(f'Layer type: {stack.layer_type}')
+            print(f'Layer activation: {stack.layer_activation}')
+            if stack.distinguished_output:
+                print(f'Output activation: {stack.output_activation}')
+            for j, layer in enumerate(stack.layers):
+                print(f'\n== LAYER {j} ==')
+                W, b = layer.get_weights()
+                if len(W.shape) == 2:
+                    n_in, n_out = W.shape
+                    print(f'n_in = {n_in}\nn_out = {n_out}')
+                elif len(W.shape) == 4:
+                    k, l, n_in, n_out = W.shape
+                    print(f'n_in = {n_in}\nn_out = {n_out}')
+                    print(f'kernel = {k}x{l}')
+                print(f'W = {W}')
+                print(f'b = {b}')
+        print('\n===== DONE =====')
 
     def build(self):
         pass
@@ -896,10 +892,10 @@ def shrink_input(stack, deleted_nodes):
     if stack.layer_type == 'dense':
         new_layer = tf.keras.layers.Dense(
                 n_out,
-                activation = layer.activation
+                activation = layer.activation,
+                kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                 )
         new_layer.build(input_shape = (1,new_in))
-        #new_layer(new_input)
         W2 = W[kept_nodes,:]
         new_layer.set_weights([W2, b])
     elif stack.layer_type == 'conv2d':
@@ -907,17 +903,15 @@ def shrink_input(stack, deleted_nodes):
                 n_out,
                 W.shape[0], # kernel size
                 activation = layer.activation,
-                padding = 'same'
+                padding = 'same',
+                kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                 )
         new_layer.build(input_shape = (1,1,1,new_in))
-        #new_layer(new_input)
         W2 = W[:,:,kept_nodes,:]
         new_layer.set_weights([W2, b])
     else: assert False
     
     stack.layers[0] = new_layer
-    #stack.input = new_input
-    #stack.build()
 
 def widen_input(stack, new_nodes, index_mode = 'prior'):
     """
@@ -946,10 +940,10 @@ def widen_input(stack, new_nodes, index_mode = 'prior'):
         new_layer = tf.keras.layers.Dense(
                 n_out,
                 activation = layer.activation,
-                kernel_initializer = tf.keras.initializers.zeros
+                kernel_initializer = tf.keras.initializers.zeros,
+                kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                 )
         new_layer.build(input_shape = (1, new_in))
-        #new_layer(new_input)
         W2, b2 = new_layer.get_weights()
         W2[old_nodes,:] = W
         new_layer.set_weights([W2, b2])
@@ -959,18 +953,16 @@ def widen_input(stack, new_nodes, index_mode = 'prior'):
                 W.shape[0], # kernel size
                 activation = layer.activation,
                 padding = 'same',
-                kernel_initializer = tf.keras.initializers.zeros
+                kernel_initializer = tf.keras.initializers.zeros,
+                kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                 )
         new_layer.build(input_shape = (1,1,1,new_in))
-        #new_layer(new_input)
         W2, b2 = new_layer.get_weights()
         W2[:,:,old_nodes,:] = W
         new_layer.set_weights([W2, b2])
     else: assert False
     
     stack.layers[0] = new_layer
-    #stack.input = new_input
-    #stack.build()
 
 def widen_layer(stack, layer_id, factor):
     assert factor > 1
@@ -1018,14 +1010,16 @@ def insert_nodes(stack, layer_id, node_ids, index_mode = 'prior'):
             if stack.layer_type == 'dense':
                 new_layer = tf.keras.layers.Dense(
                         new_width,
-                        activation = stack.layers[i].activation
+                        activation = stack.layers[i].activation,
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             elif stack.layer_type == 'conv2d':
                 new_layer = tf.keras.layers.Conv2D(
                         new_width,
                         kernel_size(stack.layers[i]),
                         activation = stack.layers[i].activation,
-                        padding = 'same'
+                        padding = 'same',
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             else: assert False
 
@@ -1052,7 +1046,8 @@ def insert_nodes(stack, layer_id, node_ids, index_mode = 'prior'):
                     out_layer = tf.keras.layers.Dense(
                             n,
                             activation = stack.layers[i+1].activation,
-                            kernel_initializer = tf.keras.initializers.zeros
+                            kernel_initializer = tf.keras.initializers.zeros,
+                            kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                             )
                 elif stack.layer_type == 'conv2d':
                     _, n = layer_dims(stack.layers[i+1])
@@ -1062,7 +1057,8 @@ def insert_nodes(stack, layer_id, node_ids, index_mode = 'prior'):
                             k,
                             activation = stack.layers[i+1].activation,
                             kernel_initializer = tf.keras.initializers.zeros,
-                            padding = 'same'
+                            padding = 'same',
+                            kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                             )
                 else: assert False
                 x = out_layer(x)
@@ -1108,7 +1104,8 @@ def insert_layer(stack, layer_id):
         new_layer = tf.keras.layers.Dense(
                 n,
                 activation = stack.layer_activation,
-                kernel_initializer = tf.keras.initializers.identity
+                kernel_initializer = tf.keras.initializers.identity,
+                kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                 )
     elif stack.layer_type == 'conv2d':
         k = kernel_size(stack.layers[layer_id-1])
@@ -1117,7 +1114,8 @@ def insert_layer(stack, layer_id):
                 k,
                 activation = stack.layer_activation,
                 kernel_initializer = conv2d_identity,
-                padding = 'same'
+                padding = 'same',
+                kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                 )
     else: assert False
    
@@ -1158,7 +1156,8 @@ def delete_layer(stack, layer_id, convolution_mode = 'performance'):
 
                 new_layer = tf.keras.layers.Dense( # layer that will replace l_prev
                         n,
-                        activation = l_prev.activation
+                        activation = l_prev.activation,
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             elif stack.layer_type == 'conv2d':
                 newW, newb = fold_conv2d_layers(W_prev,b_prev,W,b,kernel_size = kernel_size)
@@ -1166,7 +1165,8 @@ def delete_layer(stack, layer_id, convolution_mode = 'performance'):
                         n,
                         newW.shape[0],
                         activation = l_prev.activation,
-                        padding = 'same'
+                        padding = 'same',
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             else: assert False
             x = new_layer(x)
@@ -1204,7 +1204,8 @@ def delete_layer_old(stack, layer_id):
 
                 new_layer = tf.keras.layers.Dense( # layer that will replace l_next
                         n,
-                        activation = l_next.activation
+                        activation = l_next.activation,
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             elif stack.layer_type == 'conv2d':
                 newW, newb = fold_conv2d_layers(W,b,W2,b2, kernel_size = 'min')
@@ -1212,7 +1213,8 @@ def delete_layer_old(stack, layer_id):
                         n,
                         newW.shape[0],
                         activation = l_next.activation,
-                        padding = 'same'
+                        padding = 'same',
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             else: assert False
             x = new_layer(x)
@@ -1266,14 +1268,16 @@ def delete_nodes(stack, layer_id, node_ids):
             if stack.layer_type == 'dense':
                 new_layer = tf.keras.layers.Dense(
                         new_width,
-                        activation = stack.layers[i].activation
+                        activation = stack.layers[i].activation,
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             elif stack.layer_type == 'conv2d':
                 new_layer = tf.keras.layers.Conv2D(
                         new_width,
                         kernel_size(stack.layers[i]),
                         activation = stack.layers[i].activation,
-                        padding = 'same'
+                        padding = 'same',
+                        kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                         )
             else: assert False
 
@@ -1296,7 +1300,8 @@ def delete_nodes(stack, layer_id, node_ids):
                     out_layer = tf.keras.layers.Dense(
                             n,
                             activation = stack.layers[i+1].activation,
-                            kernel_initializer = tf.keras.initializers.zeros
+                            kernel_initializer = tf.keras.initializers.zeros,
+                            kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                             )
                 elif stack.layer_type == 'conv2d':
                     k = kernel_size(stack.layers[i+1])
@@ -1305,7 +1310,8 @@ def delete_nodes(stack, layer_id, node_ids):
                             k,
                             activation = stack.layers[i+1].activation,
                             kernel_initializer = tf.keras.initializers.zeros,
-                            padding='same'
+                            padding='same',
+                            kernel_regularizer = tf.keras.regularizers.L2(stack.l2reg)
                             )
                 else: assert False
                 x = out_layer(x)
