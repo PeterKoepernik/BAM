@@ -63,6 +63,7 @@ def test_stack(verbose = 0, layer_type = 'dense'):
         return
     n_in = 10
     n_out = 3
+    layer_widths = [6,5,3,10,n_out]
     if layer_type == 'conv2d':
         w = 20
         h = 20
@@ -70,7 +71,9 @@ def test_stack(verbose = 0, layer_type = 'dense'):
     else:
         input_shape = (n_in,)
     input_layer = keras.Input(shape = input_shape)
-    stack = Stack(input_layer, output_size = n_out, layer_type = layer_type)
+
+    #stack = Stack(input_layer, output_size = n_out, layer_type = layer_type)
+    stack = Stack(input_layer, layer_widths = layer_widths, layer_type = layer_type)
     
     model = stack.model()
     if verbose:
@@ -420,6 +423,7 @@ def test_stack_saveload(verbose = 0, layer_type = 'dense'):
         return
     n_in = 10
     n_out = 3
+    layer_widths = [6,5,3,10,n_out]
     n_batch = 100
     if layer_type == 'dense':
         input_shape = (n_in,)
@@ -429,9 +433,13 @@ def test_stack_saveload(verbose = 0, layer_type = 'dense'):
         input_shape = (w,h,n_in)
     input_layer = keras.Input(shape = input_shape)
 
-    s0 = Stack(input_layer, output_size = n_out, layer_type = layer_type)
+    #s0 = Stack(input_layer, output_size = n_out, layer_type = layer_type)
+    s0 = Stack(input_layer, layer_widths = layer_widths, layer_type = layer_type)
     name = 'my stack boobieboo'
     path = os.path.join(os.getcwd(),'saves','stacks',name)
+    if os.path.exists(path):
+        import shutil
+        shutil.rmtree(path)
     s0.save(path)
     s1 = Stack.load(path, s0.input)
 
@@ -441,6 +449,8 @@ def test_stack_saveload(verbose = 0, layer_type = 'dense'):
     assert same_output(s0.model(), s1.model())
 
     lib.shrink_layer(s1, 0, 0.5)
+
+    s1.model().summary()
 
     assert not same_output(s0.model(), s1.model())
 
@@ -475,6 +485,10 @@ def test_arch_saveload(verbose = 0, layer_type = 'dense'):
     a0 = a.deep_copy()
 
     path = os.path.join(os.getcwd(), 'saves', 'architectures', '123haha')
+
+    if os.path.exists(path):
+        import shutil
+        shutil.rmtree(path)
 
     a0.save(path)
     a1 = Architecture.load(path)

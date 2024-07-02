@@ -1,3 +1,6 @@
+saves/architectures/123haha
+saves/stacks/my\ stack\ boobieboo
+
 *.xopp
 .DS_Store
 errorFile*.txt
@@ -5,14 +8,6 @@ errorFile*.txt
 *.c
 *.o
 *.so
-
-## data files
-value_network_data_dictionary_all.json
-*/replays/
-*.replay
-data_*.json
-match*.json
-!TerminalMCTS/src/pit/analyser_replays/*
 
 ## Core latex/pdflatex auxiliary files:
 

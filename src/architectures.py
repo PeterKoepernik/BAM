@@ -1,9 +1,12 @@
 import os
 if os.path.join(os.getcwd(),'src') == os.path.dirname(os.path.realpath(__file__)):
     ###### we are being called from within this package; if we are called from terminal, BAM/src is already in the global searchpath
-    import src.lib as lib
+    # IT DOESNT WORK CURRENTLY
+    from src.lib import Architecture, Stack, flatten_node_changes, widen_input, shrink_input
+else:
+    from lib import Architecture, Stack, flatten_node_changes, widen_input, shrink_input
 
-from lib import Architecture, Stack, flatten_node_changes, widen_input, shrink_input
+#from src.lib import Architecture, Stack, flatten_node_changes, widen_input, shrink_input
 import tensorflow as tf
 import numpy as np
 
@@ -604,6 +607,7 @@ class PriorArchSimple(Architecture):
             activation = 'relu',
             initial_width = 2,
             initial_depth = 2,
+            layer_widths = None, # ignore previous two if this is not None, this is without(!) output layer
             l2reg = 0.002
             ):
 
@@ -616,6 +620,7 @@ class PriorArchSimple(Architecture):
         self.activation = activation
         self.initial_width = initial_width
         self.initial_depth = initial_depth
+        self.layer_widths = layer_widths
         self.l2reg = l2reg
 
         self.input0 = tf.keras.Input(shape = (num_stats0,))
@@ -628,6 +633,9 @@ class PriorArchSimple(Architecture):
         self.indl = list(range(num_outputs0,num_outputs0+num_outputslr))
         self.indr = list(range(num_outputs0+num_outputslr, num_outputs0+2*num_outputslr))
 
+        if layer_widths != None:
+            layer_widths.append(num_outputs0 + 2 * num_outputslr)
+
         stack = Stack(
                 input_tensor = self.concat([self.input0, self.inputl, self.inputr]),
                 layer_type = 'dense',
@@ -636,6 +644,7 @@ class PriorArchSimple(Architecture):
                 output_activation = activation,
                 initial_width = initial_width,
                 initial_depth = initial_depth,
+                layer_widths = layer_widths,
                 l2reg = l2reg
                 )
         self.stacks = [stack]
@@ -685,6 +694,7 @@ class PriorArchSimple(Architecture):
             activation = self.activation,
             initial_width = self.initial_width,
             initial_depth = self.initial_depth,
+            layer_widths = self.layer_widths,
             l2reg = self.l2reg
             )
 

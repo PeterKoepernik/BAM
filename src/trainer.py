@@ -200,7 +200,7 @@ class Population:
         if val_size == 0:
             self.val_size = ds_val.cardinality()
             
-        assert self.train_size > 0
+        assert self.val_size > 0
         assert self.train_size > 0        
 
     """

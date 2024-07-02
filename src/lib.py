@@ -153,6 +153,7 @@ class Stack:
             output_size_mutable = False,
             initial_width = 10,
             initial_depth = 2, # includes output layer
+            layer_widths = None, # ignore initial_width and initial_depth and output_size if this is not None
             l2reg = .01, # this will also be mutated
             kernel_size = 3 # only used for conv2d
             ):
@@ -166,26 +167,36 @@ class Stack:
         self.layer_type = layer_type
         self.layer_activation = layer_activation
         self.distinguished_output = distinguished_output
-        self.output_size = output_size
+        #self.output_size = output_size
         self.output_activation = output_activation
         self.output_size_mutable = output_size_mutable
-        self.initial_width = initial_width
-        self.initial_depth = initial_depth
+        #self.initial_width = initial_width
+        #self.initial_depth = initial_depth
+        if layer_widths == None:
+            if distinguished_output:
+                self.layer_widths = [initial_width] * (initial_depth - 1) + [output_size]
+            else:
+                self.layer_widths = [initial_width] * initial_depth
+        else:
+            self.layer_widths = layer_widths
         self.l2reg = l2reg
         self.kernel_size = kernel_size
 
         self.layers = []
-        for d in range(initial_depth):
-            out_layer = distinguished_output and (d == initial_depth - 1)
+        for d, w in enumerate(self.layer_widths):
+        #for d in range(initial_depth):
+            out_layer = distinguished_output and (d == len(self.layer_widths) - 1)
             if self.layer_type == 'dense':
                 self.layers.append(tf.keras.layers.Dense(
-                    output_size if out_layer else initial_width,
+                    w,
+                    #output_size if out_layer else initial_width,
                     activation = output_activation if out_layer else layer_activation,
                     kernel_regularizer = tf.keras.regularizers.L2(l2reg)
                     ))
             elif self.layer_type == 'conv2d':
                 self.layers.append(tf.keras.layers.Conv2D(
-                    output_size if out_layer else initial_width,
+                    w,
+                    #output_size if out_layer else initial_width,
                     kernel_size,
                     activation = output_activation if out_layer else layer_activation,
                     padding = 'same',
@@ -394,11 +405,12 @@ class Stack:
                 layer_type = self.layer_type,
                 layer_activation = self.layer_activation,
                 distinguished_output = self.distinguished_output,
-                output_size = self.output_size,
+                #output_size = self.output_size,
                 output_activation = self.output_activation,
                 output_size_mutable = self.output_size_mutable,
-                initial_width = self.initial_width,
-                initial_depth = self.initial_depth,
+                #initial_width = self.initial_width,
+                #initial_depth = self.initial_depth,
+                layer_widths = self.layer_widths,
                 l2reg = self.l2reg,
                 kernel_size = self.kernel_size
                 )
