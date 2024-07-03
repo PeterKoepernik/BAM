@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The idea of this little project is to automate architecture search with a genetic algorithm. On the one hand, this alleviates the sometimes troublesome task of choosing a good number and size of layers, and secondly, since the networks slowly grow as they train, it might help with issues that can arise when training a very big randomly initialised neural network, rooted in the exploding and vanishing gradient problem. The final motivation is that the simultaneous training of several networks in a population can make great use of parallelism, whereas the training of a single network is hard to parallelise well.
+The idea of this little project is to automate architecture search with a genetic algorithm. On the one hand, this alleviates the sometimes troublesome task of choosing a good number and size of layers, and secondly, since the networks slowly grow as they train, it helps with issues that can arise when training a very big neural network from random initialisation. The final motivation is that the simultaneous training of several networks in a population can make great use of parallelism, whereas it is difficult to parallelise the training of a single network.
 
 #### Usage Example
 
@@ -21,12 +21,13 @@ ds_train = ds_train.map(process).shuffle(1024).batch(32).prefetch(tf.data.AUTOTU
 ds_val = ds_val.map(process).shuffle(1024).batch(32).prefetch(tf.data.AUTOTUNE)
 ```
 
-To be able to define a networks architecture without specyfing the number of layers and their sizes, we can make use of so-called `Stack`'s. A `Stack` is a sequence of compatible layers of fixed type `dense` or `conv2d`, optionally with a distinguished final layer of fixed size. 
+To be able to define a network's architecture without specyfing the number of layers and their sizes, we can make use of so-called `Stack`'s. A `Stack` is a sequence of layers of fixed type `dense` or `conv2d`, optionally with a distinguished final layer of fixed size. 
 The abstract shape of a convolutional neural network for the MNIST classification task could look like this:
 ```
 input (28x28x1) -> Stack (conv2d) -> flatten -> Stack (dense) -> output (size 10, softmax)
 ```
-In general, to specify such a network template we need to subclass the `Architecture` class, but the structure above is already implemented in the `ConvDense` architecture, which can be initialised as follows. For later use, we have to wrap it into a factory function.
+In general, such a network template needs to be specified by subclassing `Architecture`. For the structure above, this is already implemented in the `ConvDense` class, which can be initialised as follows.
+For later use we wrap it into a factory function.
 ```python
 from src.architectures import ConvDense
 
@@ -38,12 +39,12 @@ def architecture_factory():
             output_size = 10,
             output_activation = 'softmax',
             initial_width = [5,10],
-            initial_depth = [2,2],
+            initial_depth = [2,2]
             )
 ```
-This `ConvDense` class consists of two stacks, one of type `conv2d` and one of type `dense`, initially consisting of two layers of width `5`, and two layers of width `10`, respectively. The latter includes the output layer, which is fixed to size `10` and a softmax activation. The remaining activations and the convolution kernel size are default-initialised to `'relu'` and `5`, respectively, but they could be changed using the keywords `conv2d_activation`, `layer_activation`, and `kernel_size`. The number and size of layers in the stacks are mutable (except for the output layer of the `dense` stack), and the `ConvDense` class internally makes sure that after any such change the flattened output of the last `conv2d` layer aligns with the input size of the first `dense` layer.
+An instance of the `ConvDense` class returned by this factory function consists of two stacks, one of type `conv2d` and one of type `dense`, initially comprising two layers of width `5`, and two layers of width `10`, respectively. The latter includes the output layer, which is fixed to size `10` and has a softmax activation. The remaining activations and the convolution kernel size are default-initialised to `'relu'` and `5`, respectively, but they could be changed using the keywords `conv2d_activation`, `layer_activation`, and `kernel_size`. The number and size of layers in the stacks are mutable (except for the output layer of the `dense` stack), and the implementation of the `ConvDense` class ensures that after any such change the flattened output of the last `conv2d` layer aligns with the input size of the first `dense` layer.
 
-Now we can initialise a `Population`, which keeps a pool of neural networks initialised from a given `Architecture`.
+Now we can initialise a `Population`, which maintains a pool of neural networks initialised from our factory method.
 
 ```python
 from src.trainer import Population
@@ -58,7 +59,7 @@ pop = Population(
         )
 ```
 
-The `Population` exposes two key functions. The first is `epoch()`, which trains each of the networks in the pool on a random fraction `train_data_per_epoch` of the full training set, and records their performance on the validation set. If multiple cores are availabe, this step is parallelised. The second is `mutate()`, which, in short, kills some of the poor performing networks, duplicates some of the well performing networks, and applies a random number (with mean `mutations_per_generation`) of mutations to every member of the new generation. We go into a bit more detail on the type of mutations in a subsequent section. There are many other parameters that can be passed to a `Population` to fine-tune its behaviour during these two methods. The basic usage of a `Population` is as follows.
+The `Population` exposes two key functions. The first is `epoch()`, which trains each of the networks in the pool on a random fraction `train_data_per_epoch` of the full training set, and records their performance on the validation set. If multiple cores are availabe, this step is parallelised. The second is `mutate()`, which, in short, kills some of the poor performing networks, duplicates some of the well performing networks, and applies a random number (with mean `mutations_per_generation`) of mutations to every member of the new generation. Possible mutations are insertion and deletion of individual nodes and whole layers, and we go into detail on the implementation of these mutations in the next section. There are many parameters that can be passed to a `Population` to fine-tune its behaviour during these two methods. The basic usage of a `Population` is as follows.
 
 ```python
 epochs = 50
