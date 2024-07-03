@@ -2,6 +2,7 @@
 
 ## Introduction
 
+*BAM* is a somewhat creative acronym for *<ins>B</ins>r<ins>a</ins>nching <ins>M</ins>ultiagent Optimisation*.
 The idea of this little project is to automate architecture search with a genetic algorithm. On the one hand, this alleviates the sometimes troublesome task of choosing a good number and size of layers, and secondly, since the networks slowly grow as they train, it helps with issues that can arise when training a very big neural network from random initialisation. The final motivation is that the simultaneous training of several networks in a population can make great use of parallelism, whereas it is difficult to parallelise the training of a single network.
 
 #### Usage Example
@@ -140,3 +141,7 @@ Now if the two layers have width $n$ and $n'$ instead of one, and the input size
 $$
     G_{pq} = \sum_{r=1}^n F_{pr} \star F_{rq}',\qquad p\le k,q\le n'.
 $$
+
+---
+
+*Many thanks to Michal Bassan for fun, insightful, and encouraging conversations on this idea!*
