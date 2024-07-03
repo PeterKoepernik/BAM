@@ -136,7 +136,7 @@ $$
     G(k,l) = \sum_{i,j}F(i,j) F'(k-i,k-j).
 $$
 
-Now if the two layers have width $n$ and $n'$ instead of one, and the input size of the first layer is $k$, then they are defined by filters $(F_{pq})_{p\le k,q\le n}$ and $(F'_{pq})_{p\le n,q\le n'}$, and the filters of the linearised layer are 
+Now if the two layers have width $n$ and $n'$ instead of one, and the input size of the first layer is $k$, then they are defined by filters $(F_{pq})_ {p\le k,q\le n}$ and $(F'_ {pq})_ {p\le n,q\le n'}$, and the filters of the linearised layer are 
 
 $$
     G_{pq} = \sum_{r=1}^n F_{pr} \star F_{rq}',\qquad p\le k,q\le n'.
@@ -144,4 +144,4 @@ $$
 
 ---
 
-*Many thanks to Michal Bassan for fun, insightful, and encouraging conversations on this idea!*
+*Many thanks to Michal Bassan for fun and insightful conversations on this idea!*
