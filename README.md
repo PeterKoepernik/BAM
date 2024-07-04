@@ -86,7 +86,7 @@ We can formally describe a dense layer with input dimension $n_\text{in}$ and ou
 When a node is inserted, there is a simple way to ensure that the network output is unchanged, which is to set its outgoing weights and bias to zero, and randomly initialise its incoming weights (or the other way around). Formally, if $(W,b)$ describes the mutated layer, $(W',b')$ the following one, and $n_\text{new}$ nodes are inserted, then
 
 $$
-    (W,b) \to (W',b') \quad \stackrel{\text{mutation}}{\longrightarrow}\quad (\begin{bmatrix} W \\ W_\text{new}\end{bmatrix}, \begin{bmatrix} b \\ 0_{n_\text{new}}\end{bmatrix}) \to ([ W' \, 0_{n_\text{out}' \times n_\text{new}}], b'),
+    (W,b) \to (W',b') \quad \stackrel{\text{mutation}}{\longrightarrow}\quad (\begin{bmatrix} W \\\ W_\text{new}\end{bmatrix}, \begin{bmatrix} b \\\ 0_{n_\text{new}}\end{bmatrix}) \to ([ W' \enspace 0_{n_\text{out}' \times n_\text{new}}], b'),
 $$
 
 where $W_\text{new} \in \mathbb{R}^{n_\text{new} \times n_\text{in}}$ is randomly initialised.
